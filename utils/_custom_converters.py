@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from datetime import datetime
+from ast import literal_eval
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder
@@ -17,76 +18,33 @@ class PercentageConverter(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         """
-        Convert the percentage string to a numerical value.
+        Convert the percentage string to a numerical value by removing the '%' sign and dividing by 100.
         """
-        return X.str.rstrip('%').astype(float) / 100
+        def func(X, y=None):
+            X = pd.Series(X).copy()
+            X = X.str.replace('%', '').astype(float) / 100
+            return X
+        
+        return X.apply(func)
     
 
 class ListConverter(BaseEstimator, TransformerMixin):
     """
-    Custom converter for the list features, either with low (one-hot encoding) or high (targtet encoding) cardinality.
-
-    Parameters:
-        card_type (str): The cardinality type of the list feature, either 'low' or 'high'.
+    Custom converter for the list features.
     """
-
-    def __init__(self, card_type: str):
-        if card_type not in ['low', 'high']:
-            raise ValueError("card_type must be either 'low' or 'high'")
-        
-        self.card_type = card_type
-        self.onehot_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-        self.target_mean = None
-
-                 
     def fit(self, X, y=None):
-        """
-        Fit the encoder based ont he cardinality type.
-        For 'low', fit OneHotEncoder, for 'high', compute target encoding.
-        """
-        X_cleaned = self._clean(X)
-
-        if self.card_type == 'low':
-            all_amenities = [item for sublist in X_cleaned for item in sublist]
-            self.onehot_encoder.fit(np.array(all_amenities).reshape(-1, 1))
-        elif self.card_type == 'high' and y is not None:
-            target_encoded = self._target_encode(X_cleaned, y)
-            self.target_mean = target_encoded.groupby('amenity')['price'].mean()
-        
         return self
     
     def transform(self, X):
         """
-        Transform the list features either using OneHotEncoder or target encoding base on the card_type parameter.
+        Convert the list string literal to a list of strings.
         """
-        X_cleaned = self._clean(X)
+        def func(X, y=None):
+            X = pd.Series(X).copy()
+            X = X.apply(lambda x: literal_eval(x) if isinstance(x, str) else x)
+            return X
 
-        if self.card_type == 'low':
-            flat_list = [item for sublist in X_cleaned for item in sublist]
-            encoded = self.onehot_encoder.transform(np.array(flat_list).reshape(-1, 1))
-            return pd.DataFrame(encoded, index=X.index).groupby(X.index).max()
-        
-        elif self.card_type == 'high' and self.target_mean is not None:
-            encoded_amenities = X_cleaned.apply(lambda x: [self.target_mean.get(i, 0) for i in x])
-            return pd.DataFrame(encoded_amenities.tolist(), index=X.index)
-
-    def _clean(self, X) -> list:
-        """
-        Clean the list string.
-
-        Returns:
-            list: The cleaned list.
-        """
-        return X.apply(lambda x: [i.lower() for i in eval(x)])
-    
-    def _target_encode(self, X, y):
-        """
-        
-        """
-        amenities_flat = [item for sublist in X for item in sublist]
-        amenities_df = pd.DataFrame(amenities_flat, columns=['amenity'])
-        amenities_df['price'] = y.repeat(X.apply(len)).reset_index(drop=True)
-        return amenities_df
+        return X.apply(func)
 
     
 class BooleanConverter(BaseEstimator, TransformerMixin):
@@ -109,7 +67,12 @@ class BooleanConverter(BaseEstimator, TransformerMixin):
         """
         Convert the boolean string to a boolean value (1/0).
         """
-        return X.map(self.map)
+        def func(X, y=None):
+            X = pd.Series(X).copy()
+            X = X.map(self.map)
+            return X
+        
+        return X.apply(func)
     
 
 class DateConverter(BaseEstimator, TransformerMixin):
@@ -131,5 +94,11 @@ class DateConverter(BaseEstimator, TransformerMixin):
         """
         Convert the date string to the difference in days from the baseline date.
         """
-        return (self.baseline_date - datetime.strptime(X, self.format)).days
+        def func(X, y=None):
+            X = pd.Series(X).copy()
+            X = pd.to_datetime(X)
+            X = (self.baseline_date - X).dt.days
+            return X
+            
+        return X.apply(func)
     
