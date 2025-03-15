@@ -13,33 +13,54 @@ from category_encoders import TargetEncoder
 
 from ._feature_types import *
 from ._custom_converters import PercentageConverter, ListConverter, BooleanConverter, DateConverter
+from ._custom_encoders import MultiLabelOneHotEncoder, MultiLabelTargetEncoder
     
 #------------------------------------------------------------------------------
 
-def create_pipeline(df: pd.DataFrame, model: BaseEstimator = LinearRegression(), feature_selection: _univariate_selection._BaseFilter = SelectKBest(chi2, k=20)) -> Pipeline:
+def create_pipeline(
+        df: pd.DataFrame,
+        model: BaseEstimator = LinearRegression(),
+        feature_selector: _univariate_selection._BaseFilter = SelectKBest(chi2, k=20),
+        convert: bool = True,
+        impute: bool = True,
+        encode: bool = True,
+        scale: bool = True,
+        feature_selection: bool = True,
+        model_selection: bool = True,
+        ) -> Pipeline:
     """
     Creates a pipeline for preprocessing the given dataframe.
 
     Parameters:
         df (pd.DataFrame): The dataframe to preprocess.
-        model (BaseEstimator): The model to be used in the pipeline.
+        model (BaseEstimator): The model to be used in the pipeline. Default is LinearRegression().
+        feature_selector (_univariate_selection._BaseFilter): The feature selector to be used in the pipeline. Default is SelectKBest(chi2, k=20).
+        convert (bool): Whether to convert the features or not. Default is True.
+        impute (bool): Whether to impute the missing values or not. Default is True.
+        encode (bool): Whether to encode the categorical features or not. Default is True.
+        scale (bool): Whether to scale the features or not. Default is True.
+        feature_selection (bool): Whether to add a feature selector or not. Default is True.
+        model_selection (bool): Whether to add a model or not. Default is True.
     
     Returns:
         Pipeline: The pipeline for preprocessing the dataframe.
     """
-    converters = _create_converters(df)
-    imputers = _create_imputers(df)
-    encoders = _create_encoders(df)
-    scalers = _create_scalers(df)
+    steps = []
+
+    if convert:
+        steps.append(('converters', _create_converters(df)))
+    if impute:
+        steps.append(('imputers', _create_imputers(df)))
+    if encode:
+        steps.append(('encoders', _create_encoders(df)))
+    if scale:
+        steps.append(('scalers', _create_scalers()))
+    if feature_selection:
+        steps.append(('feature_selector', feature_selector))
+    if model_selection:
+        steps.append(('model_selection', model))
     
-    return Pipeline(steps=[
-        ('converters', ColumnTransformer(converters)),
-        ('imputers', ColumnTransformer(imputers)),
-        ('encoders', ColumnTransformer(encoders)),
-        ('scalers', ColumnTransformer(scalers)),
-        ('feature_selector', feature_selection),
-        ('model', model)
-    ])
+    return Pipeline(steps=steps)
 
 
 def _create_converters(df: pd.DataFrame) -> ColumnTransformer:
@@ -49,6 +70,9 @@ def _create_converters(df: pd.DataFrame) -> ColumnTransformer:
     - List (as string to list)
     - Boolean (as string to boolean)
     - Date (as string to integer until a baseline date)
+
+    Parameters:
+        df (pd.DataFrame): The dataframe containing all the features.
 
     Returns:
         ColumnTransformer: The ColumnTransformer of converters for the given dataframe.
@@ -91,7 +115,7 @@ def _create_converters(df: pd.DataFrame) -> ColumnTransformer:
             date_features
         ))
 
-    return ColumnTransformer(converters)
+    return ColumnTransformer(converters, remainder='passthrough')
 
 
 def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
@@ -100,6 +124,12 @@ def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
     - Numerical (median)
     - Categorical (constant: 'missing')
     - Text (constant: '')
+
+    Parameters:
+        df (pd.DataFrame): The dataframe containing all the features.
+
+    Returns:
+        ColumnTransformer: The ColumnTransformer of imputers for the given dataframe.
     """
     imputers = []
 
@@ -130,7 +160,16 @@ def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
             text_features
         ))
 
-    return ColumnTransformer(imputers)
+    # Lists
+    list_features = _check_feats(df, LOW_CARD_LIST_FEATS + HIGH_CARD_LIST_FEATS)
+    if list_features:
+        imputers.append((
+            'impute_lists',
+            SimpleImputer(strategy='constant', fill_value=[]),
+            list_features
+        ))
+
+    return ColumnTransformer(imputers, remainder='passthrough')
 
 
 def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
@@ -139,6 +178,12 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
     - Categorical (ordinal encoding, one-hot encoding. and target encoding)
     - Text (TF-IDF vectorization)
     - List (target encoding)
+
+    Parameters:
+        df (pd.DataFrame): The dataframe containing all the features.
+
+    Returns:
+        ColumnTransformer: The ColumnTransformer of encoders for the given dataframe.
     """
     encoders = []
 
@@ -181,7 +226,7 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
     if low_cardinality_list_features:
         encoders.append((
             'encode_low_cardinality_list',
-            #TODO,
+            MultiLabelOneHotEncoder(),
             low_cardinality_list_features
         ))
 
@@ -189,29 +234,21 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
     if high_cardinality_list_features:
         encoders.append((
             'encode_high_cardinality_list',
-            #TODO,
+            MultiLabelTargetEncoder(),
             high_cardinality_list_features
         ))
 
-    return ColumnTransformer(encoders)
+    return ColumnTransformer(encoders, remainder='passthrough')
 
 
-def _create_scalers(df: pd.DataFrame) -> ColumnTransformer:
+def _create_scalers() -> ColumnTransformer:
     """
-    Creates a ColumnTransformer of scalers for the given dataframe on the following feature types:
-    - Numerical (standard scaling)
+    Creates a ColumnTransformer of scalers for the given dataframe on all features.
+
+    Returns:
+        ColumnTransformer: The ColumnTransformer of scalers for the given dataframe.
     """
-    scalers = []
-
-    numerical_features = _check_feats(df, NUM_FEATS + PERC_FEATS + DATE_FEATS)
-    if numerical_features:
-        scalers.append((
-            'scale_numerical',
-            StandardScaler(),
-            numerical_features
-        ))
-
-    return ColumnTransformer(scalers)
+    return ColumnTransformer(('scaler', StandardScaler()))
 
     
 def _check_feats(df: pd.DataFrame, feats: list) -> list:
