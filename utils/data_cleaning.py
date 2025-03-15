@@ -3,7 +3,7 @@ import numpy as np
 
 #------------------------------------------------------------
 
-def load_and_clean(**kwargs) -> pd.DataFrame:
+def load_and_clean(drop_columns: bool = True, drop_rows: bool = True, **kwargs) -> pd.DataFrame:
     """
     Cleans the raw data by dropping unnecessary columns and converting the target price column to a float.
 
@@ -14,13 +14,14 @@ def load_and_clean(**kwargs) -> pd.DataFrame:
         pd.DataFrame: The cleaned data as a pandas DataFrame.
     """
     data = read_data()
-    data = drop_features(data, **kwargs)
-    data = drop_rows(data, **kwargs)
+    if drop_columns:
+        data = drop_features(data, **kwargs)
+    data = drop_entries(data, drop_rows, **kwargs)
     
     return data
 
 
-def drop_rows(data: pd.DataFrame, quantile: float = 0.99, verbose: bool = False, **kwargs) -> pd.DataFrame:
+def drop_entries(data: pd.DataFrame, drop_rows: bool, quantile: float = 0.99, verbose: bool = False, **kwargs) -> pd.DataFrame:
     """
     Handles the price feature by converting it to a float and handling missing values and outliers.
 
@@ -36,6 +37,9 @@ def drop_rows(data: pd.DataFrame, quantile: float = 0.99, verbose: bool = False,
     num_rows_before = len(data)
 
     data['price'] = data['price'].str.replace('$', '').str.replace(',', '').astype(float)
+
+    if not drop_rows:
+        return data
 
     if verbose:
         print(f"Number of outliers removed above quantile {quantile} (${data['price'].quantile(quantile)}): {len(data[data['price'] > data['price'].quantile(quantile)])}")
@@ -56,13 +60,14 @@ def read_data() -> pd.DataFrame:
         pd.DataFrame: The raw data as a pandas DataFrame.
     """
     # Load the raw data from the csv gzip file
-    return pd.read_csv('data/listings.csv.gz', index_col=0, compression='gzip')
+    return pd.read_csv('data/listings.csv.gz', compression='gzip')
 
 
 def drop_features(
         data: pd.DataFrame,
         remove_redundant_feats: bool = True,
         manual_redundant_feats: list = [
+            'id',
             'listing_url',
             'scrape_id',
             'last_scraped',
