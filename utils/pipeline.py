@@ -3,11 +3,9 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.base import BaseEstimator
-from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
 
 from sklearn.impute import SimpleImputer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.feature_selection import SelectKBest, chi2, _univariate_selection
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 from category_encoders import TargetEncoder
 
@@ -19,13 +17,11 @@ from ._custom_encoders import MultiLabelOneHotEncoder, MultiLabelTargetEncoder
 
 def create_pipeline(
         df: pd.DataFrame,
-        model: BaseEstimator = LinearRegression(),
-        feature_selector: _univariate_selection._BaseFilter = SelectKBest(chi2, k=20),
+        model: BaseEstimator = DecisionTreeRegressor(random_state=24),
         convert: bool = True,
         impute: bool = True,
         encode: bool = True,
         scale: bool = True,
-        feature_selection: bool = True,
         model_selection: bool = True,
         ) -> Pipeline:
     """
@@ -34,7 +30,7 @@ def create_pipeline(
     Parameters:
         df (pd.DataFrame): The dataframe to preprocess.
         model (BaseEstimator): The model to be used in the pipeline. Default is LinearRegression().
-        feature_selector (_univariate_selection._BaseFilter): The feature selector to be used in the pipeline. Default is SelectKBest(chi2, k=20).
+        feature_selector (_univariate_selection._BaseFilter): The feature selector to be used in the pipeline. Default is SelectKBest(f_regression, k=20).
         convert (bool): Whether to convert the features or not. Default is True.
         impute (bool): Whether to impute the missing values or not. Default is True.
         encode (bool): Whether to encode the categorical features or not. Default is True.
@@ -55,8 +51,6 @@ def create_pipeline(
         steps.append(('encoders', _create_encoders(df)))
     if scale:
         steps.append(('scalers', _create_scalers()))
-    if feature_selection:
-        steps.append(('feature_selector', feature_selector))
     if model_selection:
         steps.append(('model_selection', model))
     
@@ -115,7 +109,11 @@ def _create_converters(df: pd.DataFrame) -> ColumnTransformer:
             date_features
         ))
 
-    return ColumnTransformer(converters, remainder='passthrough')
+    return ColumnTransformer(
+        converters,
+        remainder='passthrough',
+        verbose_feature_names_out=False
+        ).set_output(transform='pandas')
 
 
 def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
@@ -134,7 +132,7 @@ def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
     imputers = []
 
     # Numerical
-    numerical_features = _check_feats(df, NUM_FEATS)
+    numerical_features = _check_feats(df, NUM_FEATS + PERC_FEATS + BOOL_FEATS + DATE_FEATS)
     if numerical_features:
         imputers.append((
             'impute_numerical',
@@ -160,16 +158,11 @@ def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
             text_features
         ))
 
-    # Lists
-    list_features = _check_feats(df, LOW_CARD_LIST_FEATS + HIGH_CARD_LIST_FEATS)
-    if list_features:
-        imputers.append((
-            'impute_lists',
-            SimpleImputer(strategy='constant', fill_value=[]),
-            list_features
-        ))
-
-    return ColumnTransformer(imputers, remainder='passthrough')
+    return ColumnTransformer(
+        imputers,
+        remainder='passthrough',
+        verbose_feature_names_out=False
+        ).set_output(transform='pandas')
 
 
 def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
@@ -192,7 +185,11 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
     if ordinal_features:
         encoders.append((
             'encode_ordinal',
-            OrdinalEncoder(),
+            OrdinalEncoder(
+                categories=[['within an hour', 'within a few hours', 'within a day', 'a few days or more']],
+                handle_unknown='use_encoded_value',
+                unknown_value=-1
+            ),
             ordinal_features
         ))
 
@@ -200,7 +197,10 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
     if low_cardinality_features:
         encoders.append((
             'encode_low_cardinality',
-            OneHotEncoder(handle_unknown='ignore'),
+            OneHotEncoder(
+                sparse_output=False,
+                handle_unknown='ignore',
+                ),
             low_cardinality_features
         ))
 
@@ -208,17 +208,11 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
     if high_cardinality_features:
         encoders.append((
             'encode_high_cardinality',
-            TargetEncoder(),
+            TargetEncoder(
+                return_df=True,
+                handle_unknown=-1,
+            ),
             high_cardinality_features
-        ))
-
-    # Text
-    text_features = _check_feats(df, TEXT_FEATS)
-    if text_features:
-        encoders.append((
-            'encode_text',
-            TfidfVectorizer(),
-            text_features
         ))
 
     # List
@@ -238,7 +232,11 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
             high_cardinality_list_features
         ))
 
-    return ColumnTransformer(encoders, remainder='passthrough')
+    return ColumnTransformer(
+        encoders,
+        remainder='passthrough',
+        verbose_feature_names_out=False
+        ).set_output(transform='pandas')
 
 
 def _create_scalers() -> ColumnTransformer:
@@ -248,7 +246,11 @@ def _create_scalers() -> ColumnTransformer:
     Returns:
         ColumnTransformer: The ColumnTransformer of scalers for the given dataframe.
     """
-    return ColumnTransformer(('scaler', StandardScaler()))
+    return ColumnTransformer(
+            [('scaler', StandardScaler(), slice(None))],
+            remainder='passthrough',
+            verbose_feature_names_out=False
+            ).set_output(transform='pandas')
 
     
 def _check_feats(df: pd.DataFrame, feats: list) -> list:
