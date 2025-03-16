@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from ._feature_types import TEXT_FEATS
+
 #------------------------------------------------------------
 
 def load_and_clean(drop_columns: bool = True, drop_rows: bool = True, **kwargs) -> pd.DataFrame:
@@ -92,6 +94,7 @@ def drop_features(
         remove_missing_feats: bool = True,
         missing_threshold: float = 0.5,
         remove_single_value_feats: bool = True,
+        remove_text_feats: bool = True,
         verbose: bool = False,
         **kwargs
         ) -> pd.DataFrame:
@@ -142,5 +145,12 @@ def drop_features(
         df = df.drop(to_remove, axis=1)
         if verbose:
             print(f"Features dropped due to only one unique value:\n{to_remove}\n")
+
+    if remove_text_feats:
+        # Drop any features which are text
+        text_feats = [feat for feat in TEXT_FEATS if feat in df.columns]
+        df = df.drop(text_feats, axis=1)
+        if verbose:
+            print(f"Features dropped due to being text:\n{text_feats}\n")
 
     return df
