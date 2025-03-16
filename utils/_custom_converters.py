@@ -14,6 +14,7 @@ class PercentageConverter(BaseEstimator, TransformerMixin):
     Custom converter for the percentage features.
     """
     def fit(self, X, y=None):
+        self.feature_names_in_ = X.columns.tolist()
         return self
 
     def transform(self, X):
@@ -27,12 +28,24 @@ class PercentageConverter(BaseEstimator, TransformerMixin):
         
         return X.apply(func)
     
+    def get_feature_names_out(self, input_features=None):
+        """
+        Return the feature names for output features.
+        """
+        if input_features is None:
+            if hasattr(self, 'feature_names_in_'):
+                input_features = self.feature_names_in_
+            else:
+                raise ValueError("Transformer has not been fitted yet.")
+        return input_features
+    
 
 class ListConverter(BaseEstimator, TransformerMixin):
     """
     Custom converter for the list features.
     """
     def fit(self, X, y=None):
+        self.feature_names_in_ = X.columns.tolist()
         return self
     
     def transform(self, X):
@@ -41,10 +54,21 @@ class ListConverter(BaseEstimator, TransformerMixin):
         """
         def func(X, y=None):
             X = pd.Series(X).copy()
-            X = X.apply(lambda x: literal_eval(x) if isinstance(x, str) else x)
+            X = X.apply(lambda x: literal_eval(x) if isinstance(x, str) else '[]')
             return X
 
         return X.apply(func)
+    
+    def get_feature_names_out(self, input_features=None):
+        """
+        Return the feature names for output features.
+        """
+        if input_features is None:
+            if hasattr(self, 'feature_names_in_'):
+                input_features = self.feature_names_in_
+            else:
+                raise ValueError("Transformer has not been fitted yet.")
+        return input_features
 
     
 class BooleanConverter(BaseEstimator, TransformerMixin):
@@ -61,6 +85,7 @@ class BooleanConverter(BaseEstimator, TransformerMixin):
         self.map = {self.true_val: 1, self.false_val: 0}
 
     def fit(self, X, y=None):
+        self.feature_names_in_ = X.columns.tolist()
         return self
 
     def transform(self, X):
@@ -73,6 +98,17 @@ class BooleanConverter(BaseEstimator, TransformerMixin):
             return X
         
         return X.apply(func)
+    
+    def get_feature_names_out(self, input_features=None):
+        """
+        Return the feature names for output features.
+        """
+        if input_features is None:
+            if hasattr(self, 'feature_names_in_'):
+                input_features = self.feature_names_in_
+            else:
+                raise ValueError("Transformer has not been fitted yet.")
+        return input_features
     
 
 class DateConverter(BaseEstimator, TransformerMixin):
@@ -88,6 +124,7 @@ class DateConverter(BaseEstimator, TransformerMixin):
         self.format = format
 
     def fit(self, X, y=None):
+        self.feature_names_in_ = X.columns.tolist()
         return self
     
     def transform(self, X):
@@ -101,4 +138,15 @@ class DateConverter(BaseEstimator, TransformerMixin):
             return X
             
         return X.apply(func)
+    
+    def get_feature_names_out(self, input_features=None):
+        """
+        Return the feature names for output features.
+        """
+        if input_features is None:
+            if hasattr(self, 'feature_names_in_'):
+                input_features = self.feature_names_in_
+            else:
+                raise ValueError("Transformer has not been fitted yet.")
+        return input_features
     
