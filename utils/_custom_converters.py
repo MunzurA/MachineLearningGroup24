@@ -54,7 +54,7 @@ class ListConverter(BaseEstimator, TransformerMixin):
         """
         def func(X, y=None):
             X = pd.Series(X).copy()
-            X = X.apply(lambda x: literal_eval(x) if isinstance(x, str) else '[]')
+            X = X.apply(lambda x: literal_eval(x) if isinstance(x, str) else [])
             return X
 
         return X.apply(func)
