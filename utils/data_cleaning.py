@@ -7,9 +7,11 @@ from ._feature_types import TEXT_FEATS
 
 def load_and_clean(drop_columns: bool = True, drop_rows: bool = True, **kwargs) -> pd.DataFrame:
     """
-    Cleans the raw data by dropping unnecessary columns and converting the target price column to a float.
+    Cleans the raw data by dropping unnecessary columns and rows, and converting the target price column to a float.
 
     Parameters:
+        drop_columns (bool): Whether to drop any columns.
+        drop_rows (bool): Whether to drop any rows.
         **kwargs: Additional keyword arguments to pass to the drop_features and handle_price functions.
 
     Returns:
@@ -116,7 +118,8 @@ def drop_features(
 
     if remove_redundant_feats:
         # Drop any features which are not elevant to the analysis
-        to_remove = np.unique(manual_redundant_feats + add_redundant_feats)
+        concat = np.unique(manual_redundant_feats + add_redundant_feats)
+        to_remove = [col for col in concat if col in df.columns]
         df = df.drop(to_remove, axis=1)
         if verbose:
             print(f"Features dropped due to redundancy:\n{to_remove}\n")

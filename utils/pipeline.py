@@ -29,13 +29,11 @@ def create_pipeline(
 
     Parameters:
         df (pd.DataFrame): The dataframe to preprocess.
-        model (BaseEstimator): The model to be used in the pipeline. Default is LinearRegression().
-        feature_selector (_univariate_selection._BaseFilter): The feature selector to be used in the pipeline. Default is SelectKBest(f_regression, k=20).
+        model (BaseEstimator): The model to be used in the pipeline. Default is DecisionTreeRegressor(random_state=24).
         convert (bool): Whether to convert the features or not. Default is True.
         impute (bool): Whether to impute the missing values or not. Default is True.
         encode (bool): Whether to encode the categorical features or not. Default is True.
         scale (bool): Whether to scale the features or not. Default is True.
-        feature_selection (bool): Whether to add a feature selector or not. Default is True.
         model_selection (bool): Whether to add a model or not. Default is True.
     
     Returns:
