@@ -48,7 +48,9 @@ def drop_entries(data: pd.DataFrame, drop_rows: bool, quantile: float = 0.99, ve
     if verbose:
         print(f"Number of outliers removed above quantile {quantile} (${data['price'].quantile(quantile)}): {len(data[data['price'] > data['price'].quantile(quantile)])}")
         print(f"number of rows removed due to missing price: {data['price'].isna().sum()}")
+        print(f"number of rows removed due duplicate entries: {data.duplicated().sum()}")
     data = data[data['price'] < data['price'].quantile(quantile)]
+    data = data.drop_duplicates()
 
     if verbose:
         print(f"Number of rows left after cleaning ({num_rows_before} - {num_rows_before - len(data)}): {len(data)}")
