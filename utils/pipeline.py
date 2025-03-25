@@ -208,7 +208,8 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
             'encode_high_cardinality',
             TargetEncoder(
                 return_df=True,
-                handle_unknown=-1,
+                handle_unknown='value',
+                handle_missing='value',
             ),
             high_cardinality_features
         ))
