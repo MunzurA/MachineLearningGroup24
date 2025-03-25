@@ -129,7 +129,7 @@ def drop_features(
     if remove_high_corr_feats:
         # Drop any features which have a high correlation to another column
         corr = df.corr(numeric_only=True)
-        upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(np.bool))
+        upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(np.bool_))
         high_corr = [column for column in upper.columns if any(upper[column] > corr_threshold)]
         df = df.drop(high_corr, axis=1)
         if verbose:
