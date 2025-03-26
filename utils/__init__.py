@@ -1,75 +1,34 @@
-import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
 
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+#-----------------------------------------------------------------------------
 
-#------------------------------------------------------------------------------
-
-def _get_feature_names_from_column_transformer(column_transformer: ColumnTransformer) -> list:
+def save_figure(fig: plt.Figure, filename: str, subfolder: str = None, dpi: int = 300, bbox_inches: str = 'tight', **kwargs):
     """
-    Retrieve the feature names from a ColumnTransformer in order to reconstruct the dataframe after a conversion.
+    Saves a matplotlib figure to the figures directory in the project root.
 
     Parameters:
-        column_transformer (ColumnTransformer): The ColumnTransformer to retrieve the feature names from.
-
-    Returns:
-        list: The feature names.
+        fig (plt.Figure): The figure to save.
+        filename (str): The name of the file (without extension).
+        subfolder (str, optional): The subfolder to save the figure in. Defaults to None.
+        dpi (int, optional): The resolution of the saved figure. Defaults to 300.
+        bbox_inches (str, optional): The bounding box setting. Defaults to 'tight'.
+        **kwargs: Additional keyword arguments to pass to the plt.savefig() function.
     """
-    feature_names = []
+    # Create the figures directory if it doesn't exist
+    figures_dir = Path("figures")
+    figures_dir.mkdir(exist_ok=True)
 
-    for name, transformer, columns in column_transformer.transformers_:
-        # Skip dropped columns
-        if name == 'drop' or transformer == 'drop':
-            continue
+    # Create the subfolder if it doesn't exist
+    if subfolder:
+        save_dir = figures_dir / subfolder
+        save_dir.mkdir(exist_ok=True)
+    else:
+        save_dir = figures_dir
 
-        # Handle passthrough or remainder columns
-        if transformer == 'passthrough' or transformer == 'remainder':
-            if hasattr(column_transformer, 'feature_names_in_'):
-                feature_names.extend(column_transformer.feature_names_in_[columns])
-            else:
-                print(f"Warning: column_transformer does not have feature_names_in_ attribute.")
-            continue
+    # Ensure the filename has an extension
+    if not Path(filename).suffix:
+        filename += ".png"
 
-        # Get feature names from transformer (regular or encoded)
-        if hasattr(transformer, 'get_feature_names_out'):
-            trans_feature_names = transformer.get_feature_names_out()
-        elif hasattr(transformer, 'categories_'):
-            trans_feature_names = []
-            for i, category in enumerate(transformer.categories_):
-                for cat in category:
-                    trans_feature_names.append(f"{columns[i]}_{cat}")
-        else:
-            if isinstance(columns, list):
-                trans_feature_names = columns
-            else:
-                trans_feature_names = [columns]
-
-        feature_names.extend(trans_feature_names)
-
-    return feature_names
-
-
-def convert_df(df: pd.DataFrame, pipeline: Pipeline, target: str = 'price') -> pd.DataFrame:
-    """
-    Convert a DataFrame to a DataFrame with transformed features.
-
-    Parameters:
-        df (pd.DataFrame): The input DataFrame to be converted.
-        pipeline (Pipeline): The pipeline containing the feature transformation steps.
-        target (str): The target column name.
-
-    Returns:
-        pd.DataFrame: A DataFrame with transformed features.
-    """
-    # Extract the target variable and features
-    X = df.drop(columns=[target])
-    y = df[target]
-
-    # Fit the pipeline and transform the data
-    X_transformed = pipeline.fit_transform(X, y)
-
-    # Get the feature names from the converter ColumnTransformer
-    column_transformer = pipeline.named_steps['converters']
-    feature_names = _get_feature_names_from_column_transformer(column_transformer)
-
-    return pd.DataFrame(X_transformed, columns=feature_names)
+    save_path = save_dir / filename
+    fig.savefig(save_path, dpi=dpi, bbox_inches=bbox_inches, **kwargs)
