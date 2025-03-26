@@ -121,7 +121,7 @@ def drop_features(
     if remove_redundant_feats:
         # Drop any features which are not elevant to the analysis
         concat = np.unique(manual_redundant_feats + add_redundant_feats)
-        to_remove = [col for col in concat if col in df.columns]
+        to_remove = [str(col) for col in concat if col in df.columns]
         df = df.drop(to_remove, axis=1)
         if verbose:
             print(f"Features dropped due to redundancy:\n{to_remove}\n")
