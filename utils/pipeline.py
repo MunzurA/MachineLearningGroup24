@@ -5,23 +5,28 @@ from sklearn.compose import ColumnTransformer
 from sklearn.base import BaseEstimator
 from sklearn.tree import DecisionTreeRegressor
 
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import SimpleImputer, IterativeImputer
+from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, RobustScaler
+from sklearn.feature_selection import SelectKBest, f_regression
 from category_encoders import TargetEncoder
 
 from ._feature_types import *
 from ._custom_converters import PercentageConverter, ListConverter, BooleanConverter, DateConverter
 from ._custom_encoders import MultiLabelOneHotEncoder, MultiLabelTargetEncoder
+from ._config import *
     
 #------------------------------------------------------------------------------
 
 def create_pipeline(
         df: pd.DataFrame,
-        model: BaseEstimator = DecisionTreeRegressor(random_state=24),
+        model: BaseEstimator = DecisionTreeRegressor(random_state=RANDOM_STATE),
+        filter: BaseEstimator = SelectKBest(f_regression, k=20),
         convert: bool = True,
         impute: bool = True,
         encode: bool = True,
         scale: bool = True,
+        feature_selection: bool = True,
         model_selection: bool = True,
         ) -> Pipeline:
     """
@@ -30,10 +35,12 @@ def create_pipeline(
     Parameters:
         df (pd.DataFrame): The dataframe to preprocess.
         model (BaseEstimator): The model to be used in the pipeline. Default is DecisionTreeRegressor(random_state=24).
+        filter (BaseEstimator): The filter to be used in the pipeline. Default is SelectKBest(f_regression, k=20).
         convert (bool): Whether to convert the features or not. Default is True.
         impute (bool): Whether to impute the missing values or not. Default is True.
         encode (bool): Whether to encode the categorical features or not. Default is True.
         scale (bool): Whether to scale the features or not. Default is True.
+        feature_selection (bool): Whether to select the features or not. Default is True.
         model_selection (bool): Whether to add a model or not. Default is True.
     
     Returns:
@@ -48,7 +55,9 @@ def create_pipeline(
     if encode:
         steps.append(('encoders', _create_encoders(df)))
     if scale:
-        steps.append(('scalers', _create_scalers()))
+        steps.append(('scalers', _create_scalers(df)))
+    if feature_selection:
+        steps.append(('feature_selection', filter))
     if model_selection:
         steps.append(('model_selection', model))
     
@@ -110,16 +119,18 @@ def _create_converters(df: pd.DataFrame) -> ColumnTransformer:
     return ColumnTransformer(
         converters,
         remainder='passthrough',
-        verbose_feature_names_out=False
+        n_jobs=-1,
+        verbose_feature_names_out=False,
+        force_int_remainder_cols=False,
         ).set_output(transform='pandas')
 
 
 def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
     """
     Creates a ColumnTransformer of imputers for the given dataframe on the following feature types:
-    - Numerical (median)
-    - Categorical (constant: 'missing')
-    - Text (constant: '')
+    - Numerical (iterative imputation)
+    - Categorical (constant imputation: 'missing')
+    - Text (constant imputation: '')
 
     Parameters:
         df (pd.DataFrame): The dataframe containing all the features.
@@ -134,7 +145,11 @@ def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
     if numerical_features:
         imputers.append((
             'impute_numerical',
-            SimpleImputer(strategy='median'),
+            IterativeImputer(
+                initial_strategy='median',
+                min_value=0,
+                random_state=RANDOM_STATE,
+            ),
             numerical_features
         ))
 
@@ -143,7 +158,10 @@ def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
     if categorical_features:
         imputers.append((
             'impute_categorical',
-            SimpleImputer(strategy='constant', fill_value='missing'),
+            SimpleImputer(
+                strategy='constant',
+                fill_value="missing",
+            ),
             categorical_features
         ))
 
@@ -152,14 +170,19 @@ def _create_imputers(df: pd.DataFrame) -> ColumnTransformer:
     if text_features:
         imputers.append((
             'impute_text',
-            SimpleImputer(strategy='constant', fill_value=''),
+            SimpleImputer(
+                strategy='constant',
+                fill_value='',
+            ),
             text_features
         ))
 
     return ColumnTransformer(
         imputers,
         remainder='passthrough',
-        verbose_feature_names_out=False
+        n_jobs=-1,
+        verbose_feature_names_out=False,
+        force_int_remainder_cols=False,
         ).set_output(transform='pandas')
 
 
@@ -184,9 +207,7 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
         encoders.append((
             'encode_ordinal',
             OrdinalEncoder(
-                categories=[['within an hour', 'within a few hours', 'within a day', 'a few days or more']],
-                handle_unknown='use_encoded_value',
-                unknown_value=-1
+                categories=[['within an hour', 'within a few hours', 'within a day', 'a few days or more', 'missing']],
             ),
             ordinal_features
         ))
@@ -234,21 +255,39 @@ def _create_encoders(df: pd.DataFrame) -> ColumnTransformer:
     return ColumnTransformer(
         encoders,
         remainder='passthrough',
-        verbose_feature_names_out=False
+        n_jobs=-1,
+        verbose_feature_names_out=False,
+        force_int_remainder_cols=False,
         ).set_output(transform='pandas')
 
 
-def _create_scalers() -> ColumnTransformer:
+def _create_scalers(df: pd.DataFrame) -> ColumnTransformer:
     """
     Creates a ColumnTransformer of scalers for the given dataframe on all features.
+
+    Parameters:
+        df (pd.DataFrame): The dataframe containing all the features.
 
     Returns:
         ColumnTransformer: The ColumnTransformer of scalers for the given dataframe.
     """
+    scalers = []
+
+    # Numerical (robust scaling)
+    num_feats = _check_feats(df, NUM_FEATS + HIGH_CARD_FEATS + TEXT_FEATS + HIGH_CARD_LIST_FEATS + DATE_FEATS)
+    if num_feats:
+        scalers.append((
+            'scale_numerical',
+            RobustScaler(),
+            num_feats
+        ))
+
     return ColumnTransformer(
-            [('scaler', StandardScaler(), slice(None))],
+            scalers,
             remainder='passthrough',
-            verbose_feature_names_out=False
+            n_jobs=-1,
+            verbose_feature_names_out=False,
+            force_int_remainder_cols=False,
             ).set_output(transform='pandas')
 
     

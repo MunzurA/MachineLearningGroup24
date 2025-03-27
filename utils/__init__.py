@@ -1,5 +1,8 @@
 import matplotlib.pyplot as plt
+import pandas as pd
+
 from pathlib import Path
+from sklearn.pipeline import Pipeline
 
 #-----------------------------------------------------------------------------
 
@@ -32,3 +35,37 @@ def save_figure(fig: plt.Figure, filename: str, subfolder: str = None, dpi: int 
 
     save_path = save_dir / filename
     fig.savefig(save_path, dpi=dpi, bbox_inches=bbox_inches, **kwargs)
+
+
+def debug_pipeline(pipeline: Pipeline, X_test: pd.DataFrame):
+    """
+    Debug a scikit-learn pipeline by showing transformations and NaN values at each step.
+
+    Parameters:
+        pipeline (sklearn.Pipeline): The sklearn Pipeline object to debug
+        X_test (pd.DataFrame): The test data to transform
+    """
+    X = X_test.copy()
+
+    print(f"Original data shape: {X.shape}")
+    print(f"Original NaN count: {X.isna().sum().sum()}")
+
+    for name, transformer in pipeline.steps:
+        print(f"\n{'='*50}")
+        print(f"Step: {name}")
+
+        if name == 'model_selection':
+            print("Skipping model step")
+            continue
+
+        X = transformer.transform(X)
+
+        print(f"Transformed data shape: {X.shape}")
+        print(f"Transformed NaN count: {X.isna().sum().sum()}")
+
+        if X.isna().sum().sum() > 0:
+            nan_cols = X.columns[X.isna().any()].tolist()
+            print(f"Columns with NaN values: {nan_cols}")
+            for col in nan_cols:
+                nan_count = X[col].isna().sum()
+                print(f" - {col}: {nan_count} NaNs ({nan_count/len(X)*100:.2f}%)")
