@@ -47,7 +47,7 @@ def fit_tune_predict_visualize(
         y_test: pd.Series,
         gscv_param_grid: dict = None,
         rscv_param_dist: dict = None,
-        cv: int = 5,
+        cv: int = 3,
         scoring: str = 'r2',
         n_jobs: int = -1,
         n_iter: int = 50,
@@ -76,7 +76,7 @@ def fit_tune_predict_visualize(
         y_test (pd.Series): The test labels.
         gscv_param_grid (dict): The parameter grid for gridsearch. Default is None.
         rscv_param_dist (dict): The parameter distribution for randomsearch. Default is None.
-        cv (int): The number of cross-validation folds. Default is 5.
+        cv (int): The number of cross-validation folds. Default is 3.
         scoring (str): The scoring metric to use. Default is 'r2'.
         n_jobs (int): The number of jobs to run in parallel. Default is -1 (all available cores).
         n_iter (int): Thee number of parameter settings that are sampled. Default is 50.
