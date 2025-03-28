@@ -332,9 +332,8 @@ def _plot_residuals(model_name: str, y_pred: np.ndarray, y_test: pd.Series):
     sns.scatterplot(
         x=y_pred,
         y=res,
-        hue=y_pred,
         alpha=.5,
-        palette=COLORS[0],
+        color=COLORS[0],
     )
     plt.axhline(0, color=COLORS[1], linestyle='--', linewidth=1)
     plt.title(f"{model_name} Residuals")
