@@ -6,7 +6,7 @@ from sklearn.pipeline import Pipeline
 
 #-----------------------------------------------------------------------------
 
-def save_figure(fig: plt.Figure, filename: str, subfolder: str = None, dpi: int = 300, bbox_inches: str = 'tight', **kwargs):
+def save_figure(fig: plt.Figure, filename: str, subfolder: str = None, subsubfolder: str = None, dpi: int = 300, bbox_inches: str = 'tight', **kwargs):
     """
     Saves a matplotlib figure to the figures directory in the project root.
 
@@ -14,6 +14,7 @@ def save_figure(fig: plt.Figure, filename: str, subfolder: str = None, dpi: int 
         fig (plt.Figure): The figure to save.
         filename (str): The name of the file (without extension).
         subfolder (str, optional): The subfolder to save the figure in. Defaults to None.
+        subsubfolder (str, optional): The subsubfolder to save the figure in. Defaults to None.
         dpi (int, optional): The resolution of the saved figure. Defaults to 300.
         bbox_inches (str, optional): The bounding box setting. Defaults to 'tight'.
         **kwargs: Additional keyword arguments to pass to the plt.savefig() function.
@@ -28,6 +29,10 @@ def save_figure(fig: plt.Figure, filename: str, subfolder: str = None, dpi: int 
         save_dir.mkdir(exist_ok=True)
     else:
         save_dir = figures_dir
+
+    if subsubfolder:
+        save_dir = save_dir / subsubfolder
+        save_dir.mkdir(exist_ok=True)
 
     # Ensure the filename has an extension
     if not Path(filename).suffix:
