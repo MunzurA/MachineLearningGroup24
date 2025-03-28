@@ -181,7 +181,7 @@ def fit_tune_predict_visualize(
         if verbose:
             print(f"Picked RandomSearchCV ({rscv_best_score:.4f}) as GridSearchCV was not specified\n")
     else:
-        best_estimator = pipeline[:-1]
+        best_estimator = pipeline
 
         if verbose:
             print(f"Picked the original model as no tuning was specified\n")
