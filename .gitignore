@@ -156,3 +156,4 @@ pyrightconfig.json
 test.ipynb
 utils/__pycache__/
 figures/
+models/
